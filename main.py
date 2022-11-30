@@ -66,7 +66,7 @@ class AbstractCar:
         self.max_vel = max_vel
         self.vel = 0
         self.rotation_vel = rotation_vel
-        self.angle = 90
+        self.angle = 0
         self.x, self.y = self.START_POS
         self.acceleration = 0.1
 
