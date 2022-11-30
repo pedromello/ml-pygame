@@ -1,7 +1,7 @@
 import pygame
 import time
 import math
-from utils import scale_image, blit_rotate_center, blit_text_center
+from utils import scale_image, blit_rotate_center, blit_text_center, contains
 pygame.font.init()
 
 GRASS = scale_image(pygame.image.load("imgs/grass.jpg"), 2.5)
@@ -107,9 +107,63 @@ class AbstractCar:
         self.vel = 0
 
 
+class SensorBullet:
+    def __init__(self, car, base_angle, vel, color):
+        self.x = car.x + CAR_WIDTH/2
+        self.y = car.y + CAR_HEIGHT/2
+        self.angle = car.angle
+        self.base_angle = base_angle
+        self.vel = vel
+        self.color = color
+        self.img = pygame.Surface((4, 4))
+        self.fired = False
+        self.hit = False
+        self.last_poi = None
+
+    def draw(self, win):
+        pygame.draw.circle(win, self.color, (self.x, self.y), 2)
+
+    def fire(self, car):
+        self.angle = car.angle + self.base_angle
+        self.x = car.x + CAR_WIDTH/2
+        self.y = car.y + CAR_HEIGHT/2
+        self.fired = True
+        self.hit = False
+
+    def move(self):
+        if(self.fired):
+            radians = math.radians(self.angle)
+            vertical = math.cos(radians) * self.vel
+            horizontal = math.sin(radians) * self.vel
+
+            self.y -= vertical
+            self.x -= horizontal
+
+    def collide(self, x=0, y=0):
+        bullet_mask = pygame.mask.from_surface(self.img)
+        offset = (int(self.x - x), int(self.y - y))
+        poi = TRACK_BORDER_MASK.overlap(bullet_mask, offset)
+        if poi:
+            self.fired = False
+            self.hit = True
+            self.last_poi = poi
+        return poi
+
+    def draw_line(self, win, car):
+        if self.hit:
+            pygame.draw.line(win, self.color, (car.x + CAR_WIDTH/2, car.y + CAR_HEIGHT/2), (self.x, self.y), 1)
+            pygame.display.update()
+    
+
+
+
 class PlayerCar(AbstractCar):
     IMG = RED_CAR
     START_POS = (180, 200)
+
+    def __init__(self, max_vel, rotation_vel):
+        super().__init__(max_vel, rotation_vel)
+        self.sensors = [SensorBullet(self, 25, 12, (0, 0, 255)), SensorBullet(self, 10, 12, (0, 0, 255)), SensorBullet(self, 0, 12, (0, 255, 0)), SensorBullet(self, -10, 12, (0, 0, 255)), SensorBullet(self, -25, 12, (0, 0, 255))]
 
     def reduce_speed(self):
         self.vel = max(self.vel - self.acceleration / 2, 0)
@@ -119,29 +173,19 @@ class PlayerCar(AbstractCar):
         self.vel = -self.vel
         self.move()
 
-    def drawSensors(self):
-        radians = math.radians(self.angle)
-        vertical = -math.cos(radians)
-        horizontal = math.sin(radians)
-        car_center = pygame.math.Vector2(self.x + CAR_WIDTH/2, self.y + CAR_HEIGHT/2)
+    def fireSensors(self): 
+        for bullet in self.sensors:
+            bullet.fire(self)
+    
+    def sensorControl(self):
+        #print(contains(self.sensors, lambda x: x.hit))
 
-        pivot_sensor = pygame.math.Vector2(car_center.x + horizontal * -100, car_center.y - vertical * -100)
+        if(not contains(self.sensors, lambda x: x.fired)):
+            for bullet in self.sensors:
+                bullet.fire(self)
 
-        #sensor1 = Vector(30, 0).rotate(self.angle) #+ self.pos # atualiza a posição do sensor 1
-        #sensor2 = Vector(30, 0).rotate((self.angle+30)%360) #+ self.pos # atualiza a posição do sensor 2
-        #sensor3 = Vector(30, 0).rotate((self.angle-30)%360) #+ self.pos # atualiza a posição do sensor 3
-
-        #rotate pivot sensor around car center
-        sensor_2 = pivot_sensor.rotate((self.angle+30)%360)
-
-        # Sensor 1
-        pygame.draw.line(WIN, (255, 0, 0), car_center, pivot_sensor, 2)
-
-        # Sensor 2
-        pygame.draw.line(WIN, (255, 0, 0), car_center, sensor_2, 2)
-
-        # Sensor 3
-        #pygame.draw.line(WIN, (255, 0, 0), (self.x, self.y), (self.x + horizontal * 100, self.y - vertical * 100), 2)
+        for bullet in self.sensors:
+            bullet.move()
 
 
 class ComputerCar(AbstractCar):
@@ -222,8 +266,11 @@ def draw(win, images, player_car, computer_car, game_info):
     win.blit(vel_text, (10, HEIGHT - vel_text.get_height() - 10))
 
     player_car.draw(win)
-    player_car.drawSensors()
     computer_car.draw(win)
+
+    for bullet in player_car.sensors:
+        bullet.draw(win)
+
     pygame.display.update()
 
     
@@ -243,6 +290,8 @@ def move_player(player_car):
     if keys[pygame.K_s]:
         moved = True
         player_car.move_backward()
+    if keys[pygame.K_SPACE]:
+        player_car.fireSensors()
 
     if not moved:
         player_car.reduce_speed()
@@ -251,6 +300,10 @@ def move_player(player_car):
 def handle_collision(player_car, computer_car, game_info):
     if player_car.collide(TRACK_BORDER_MASK) != None:
         player_car.bounce()
+
+    for bullet in player_car.sensors:
+        if bullet.collide() != None:
+            bullet.draw_line(WIN, player_car)
 
     computer_finish_poi_collide = computer_car.collide(
         FINISH_MASK, *FINISH_POSITION)
@@ -277,7 +330,7 @@ run = True
 clock = pygame.time.Clock()
 images = [(GRASS, (0, 0)), (TRACK, (0, 0)),
           (FINISH, FINISH_POSITION), (TRACK_BORDER, (0, 0))]
-player_car = PlayerCar(4, 4)
+player_car = PlayerCar(2.5, 4)
 computer_car = ComputerCar(2, 4, PATH)
 game_info = GameInfo()
 
@@ -307,6 +360,7 @@ while run:
     computer_car.move()
 
     handle_collision(player_car, computer_car, game_info)
+    player_car.sensorControl()
 
     if game_info.game_finished():
         blit_text_center(WIN, MAIN_FONT, "You won the game!")
