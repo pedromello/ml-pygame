@@ -3,6 +3,7 @@ import time
 import math
 from utils import scale_image, blit_rotate_center, blit_text_center, contains
 pygame.font.init()
+import agent
 
 GRASS = scale_image(pygame.image.load("imgs/grass.jpg"), 2.5)
 TRACK = scale_image(pygame.image.load("imgs/track.png"), 0.9)
@@ -154,9 +155,6 @@ class SensorBullet:
             pygame.draw.line(win, self.color, (car.x + CAR_WIDTH/2, car.y + CAR_HEIGHT/2), (self.x, self.y), 1)
             pygame.display.update()
     
-
-
-
 class PlayerCar(AbstractCar):
     IMG = RED_CAR
     START_POS = (180, 200)
@@ -164,6 +162,7 @@ class PlayerCar(AbstractCar):
     def __init__(self, max_vel, rotation_vel):
         super().__init__(max_vel, rotation_vel)
         self.sensors = [SensorBullet(self, 25, 12, (0, 0, 255)), SensorBullet(self, 10, 12, (0, 0, 255)), SensorBullet(self, 0, 12, (0, 255, 0)), SensorBullet(self, -10, 12, (0, 0, 255)), SensorBullet(self, -25, 12, (0, 0, 255))]
+        self.distance = math.sqrt((self.x - FINISH_POSITION[0])**2 + (self.y - FINISH_POSITION[1])**2)
 
     def reduce_speed(self):
         self.vel = max(self.vel - self.acceleration / 2, 0)
@@ -187,6 +186,9 @@ class PlayerCar(AbstractCar):
         for bullet in self.sensors:
             bullet.move()
 
+    def final_distance(self):
+        res = math.sqrt((self.x - FINISH_POSITION[0])**2 + (self.y - FINISH_POSITION[1])**2)
+        return res
 
 class ComputerCar(AbstractCar):
     IMG = GREEN_CAR
@@ -248,6 +250,15 @@ class ComputerCar(AbstractCar):
         self.vel = self.max_vel + (level - 1) * 0.2
         self.current_point = 0
 
+# class Reward():
+#     def __init__(self):
+#         self.last_reward = 0
+
+#     def set_last_reward(self, reward):
+#         self.last_reward = reward
+
+#     def get_last_reward(self):
+#         return self.last_reward
 
 def draw(win, images, player_car, computer_car, game_info):
     for img, pos in images:
@@ -273,13 +284,11 @@ def draw(win, images, player_car, computer_car, game_info):
 
     pygame.display.update()
 
-    
-
-
 def move_player(player_car):
     keys = pygame.key.get_pressed()
     moved = False
 
+    #Trocar só a condição
     if keys[pygame.K_a]:
         player_car.rotate(left=True)
     if keys[pygame.K_d]:
@@ -325,7 +334,6 @@ def handle_collision(player_car, computer_car, game_info):
             player_car.reset()
             computer_car.next_level(game_info.level)
 
-
 run = True
 clock = pygame.time.Clock()
 images = [(GRASS, (0, 0)), (TRACK, (0, 0)),
@@ -333,6 +341,10 @@ images = [(GRASS, (0, 0)), (TRACK, (0, 0)),
 player_car = PlayerCar(2.5, 4)
 computer_car = ComputerCar(2, 4, PATH)
 game_info = GameInfo()
+agent = Agent()
+scores = []
+#verificar se precisa explicitar que o last_reward é global
+last_reward = 0
 
 while run:
     clock.tick(FPS)
@@ -356,7 +368,12 @@ while run:
             run = False
             break
 
-    move_player(player_car)
+    orientation = Vector(*self.car.velocity).angle((xx,yy))/180. # direção do carro com relação ao objetivo (se o carro está apontando perfeitamente para o objetivo a orientação é igual a zero
+    #Adicionar os sensores e verificar se há a necessidade da orientação
+    last_signal = [self.car.signal1, self.car.signal2, self.car.signal3, orientation, -orientation] # esse é o vetor de entrada, composto por três sinais dos sensores mais a orientação positiva e negativa
+    action = agent.update(last_reward, last_signal) # a rede neural vai indicar a próxima ação
+    scores.append(brain.score())
+    move_player(player_car, )
     computer_car.move()
 
     handle_collision(player_car, computer_car, game_info)
