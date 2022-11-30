@@ -66,7 +66,7 @@ class AbstractCar:
         self.max_vel = max_vel
         self.vel = 0
         self.rotation_vel = rotation_vel
-        self.angle = 0
+        self.angle = 90
         self.x, self.y = self.START_POS
         self.acceleration = 0.1
 
@@ -90,7 +90,7 @@ class AbstractCar:
     def move(self):
         radians = math.radians(self.angle)
         vertical = math.cos(radians) * self.vel
-        horizontal = math.sin(radians) * self.vel
+        horizontal = math.sin(radians) * self.vel 
 
         self.y -= vertical
         self.x -= horizontal
@@ -153,8 +153,11 @@ class SensorBullet:
         if self.hit:
             pygame.draw.line(win, self.color, (car.x + CAR_WIDTH/2, car.y + CAR_HEIGHT/2), (self.x, self.y), 1)
             pygame.display.update()
-    
 
+    def get_distance_from_poi(self, car):
+        if self.last_poi is None:
+            return -1
+        return math.sqrt((car.x - self.last_poi[0])**2 + (car.y - self.last_poi[1])**2)
 
 
 class PlayerCar(AbstractCar):
@@ -180,12 +183,16 @@ class PlayerCar(AbstractCar):
     def sensorControl(self):
         #print(contains(self.sensors, lambda x: x.hit))
 
-        if(not contains(self.sensors, lambda x: x.fired)):
-            for bullet in self.sensors:
+
+        for bullet in self.sensors:
+            if not bullet.fired:
                 bullet.fire(self)
 
         for bullet in self.sensors:
             bullet.move()
+    
+    def get_distance_array(self):
+        return [bullet.get_distance_from_poi(self) for bullet in self.sensors]
 
 
 class ComputerCar(AbstractCar):
@@ -290,8 +297,6 @@ def move_player(player_car):
     if keys[pygame.K_s]:
         moved = True
         player_car.move_backward()
-    if keys[pygame.K_SPACE]:
-        player_car.fireSensors()
 
     if not moved:
         player_car.reduce_speed()
@@ -361,6 +366,8 @@ while run:
 
     handle_collision(player_car, computer_car, game_info)
     player_car.sensorControl()
+
+    print(player_car.get_distance_array())
 
     if game_info.game_finished():
         blit_text_center(WIN, MAIN_FONT, "You won the game!")
