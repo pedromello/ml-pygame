@@ -91,7 +91,7 @@ class AbstractCar:
     def move(self):
         radians = math.radians(self.angle)
         vertical = math.cos(radians) * self.vel
-        horizontal = math.sin(radians) * self.vel
+        horizontal = math.sin(radians) * self.vel 
 
         self.y -= vertical
         self.x -= horizontal
@@ -154,7 +154,12 @@ class SensorBullet:
         if self.hit:
             pygame.draw.line(win, self.color, (car.x + CAR_WIDTH/2, car.y + CAR_HEIGHT/2), (self.x, self.y), 1)
             pygame.display.update()
-    
+
+    def get_distance_from_poi(self, car):
+        if self.last_poi is None:
+            return -1
+        return math.sqrt((car.x - self.last_poi[0])**2 + (car.y - self.last_poi[1])**2)
+        
 class PlayerCar(AbstractCar):
     IMG = RED_CAR
     START_POS = (180, 200)
@@ -179,12 +184,16 @@ class PlayerCar(AbstractCar):
     def sensorControl(self):
         #print(contains(self.sensors, lambda x: x.hit))
 
-        if(not contains(self.sensors, lambda x: x.fired)):
-            for bullet in self.sensors:
+
+        for bullet in self.sensors:
+            if not bullet.fired:
                 bullet.fire(self)
 
         for bullet in self.sensors:
             bullet.move()
+    
+    def get_distance_array(self):
+        return [bullet.get_distance_from_poi(self) for bullet in self.sensors]
 
     def final_distance(self):
         res = math.sqrt((self.x - FINISH_POSITION[0])**2 + (self.y - FINISH_POSITION[1])**2)
@@ -299,8 +308,6 @@ def move_player(player_car):
     if keys[pygame.K_s]:
         moved = True
         player_car.move_backward()
-    if keys[pygame.K_SPACE]:
-        player_car.fireSensors()
 
     if not moved:
         player_car.reduce_speed()
@@ -378,6 +385,8 @@ while run:
 
     handle_collision(player_car, computer_car, game_info)
     player_car.sensorControl()
+
+    print(player_car.get_distance_array())
 
     if game_info.game_finished():
         blit_text_center(WIN, MAIN_FONT, "You won the game!")
