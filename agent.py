@@ -55,11 +55,11 @@ class Agent():
 
 	def save(self):
 		torch.save({'state_dict': self.model.state_dict(),
-					'optimizer': self.optimizer.state_dict()}, 'last_brain2.pth')
+					'optimizer': self.optimizer.state_dict()}, 'last_brain3.pth')
 	
 	def load(self):
-		if os.path.isfile('last_brain2.pth'):
-			checkpoint = torch.load('last_brain2.pth')
+		if os.path.isfile('last_brain3.pth'):
+			checkpoint = torch.load('last_brain3.pth')
 			self.model.load_state_dict(checkpoint['state_dict'])
 			self.optimizer.load_state_dict(checkpoint['optimizer'])
 			print('Carregado com sucesso')
@@ -74,8 +74,8 @@ class Network(nn.Module):
 		self.nb_action = nb_action
 		
 		# 5 -> 30 -> 3 - full connection (dense)
-		self.fc1 = nn.Linear(input_size, 30)
-		self.fc2 = nn.Linear(30, nb_action)
+		self.fc1 = nn.Linear(input_size, 50)
+		self.fc2 = nn.Linear(50, nb_action)
 		
 	def forward(self, state):
 		x = F.relu(self.fc1(state))
