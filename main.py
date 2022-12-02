@@ -4,12 +4,16 @@ import math
 from utils import scale_image, blit_rotate_center, blit_text_center, contains
 pygame.font.init()
 from agent import Agent
+from wavefront import wave_front
 
 GRASS = scale_image(pygame.image.load("imgs/grass.jpg"), 2.5)
 TRACK = scale_image(pygame.image.load("imgs/track.png"), 0.9)
 
 TRACK_BORDER = scale_image(pygame.image.load("imgs/track-border.png"), 0.9)
 TRACK_BORDER_MASK = pygame.mask.from_surface(TRACK_BORDER)
+
+WAVEFRONT_TRACK_BORDER = scale_image(pygame.image.load("imgs/wavefront-track.png"), 0.9)
+WAVEFRONT_TRACK_BORDER_MASK = pygame.mask.from_surface(TRACK_BORDER)
 
 FINISH = pygame.image.load("imgs/finish.png")
 FINISH_MASK = pygame.mask.from_surface(FINISH)
@@ -169,6 +173,9 @@ class PlayerCar(AbstractCar):
 	def __init__(self, max_vel, rotation_vel):
 		super().__init__(max_vel, rotation_vel)
 		self.sensors = [SensorBullet(self, 25, 12, (100, 0, 255)), SensorBullet(self, 10, 12, (200, 0, 255)), SensorBullet(self, 0, 12, (0, 255, 0)), SensorBullet(self, -10, 12, (0, 0, 255)), SensorBullet(self, -25, 12, (0, 0, 255))]
+		self.last_wavefront_value = 0
+		self.current_wavefront_value = 0
+		self.last_vel_value = 0
 		# self.distance = ComputerCar.
 
 	def reduce_speed(self):
@@ -198,13 +205,14 @@ class PlayerCar(AbstractCar):
 
 	def move_forward(self):
 		global last_reward
+		self.last_vel_value = self.vel
 		self.vel = min(self.vel + self.acceleration, self.max_vel)
 		if self.vel >= 2:
-			last_reward = 1
+			last_reward = last_reward + 10
 		if self.vel <= 0.5:
-			last_reward = -0.2
+			last_reward = last_reward -0.2
 		if self.vel == 0:
-			last_reward = -5
+			last_reward = last_reward -5
 		self.move()
 
 	# def final_distance(self):
@@ -329,18 +337,18 @@ def move_player(player_car, action):
 	moved = False
 
 	if keys == 2 or keys == 3:
-		last_reward = check_curve_distances(keys)
+		#last_reward = check_curve_distances(keys)
 		if keys == 2:
 			player_car.rotate(left=True)
 		else:
 			player_car.rotate(right=True)
 	if keys == 0:
-		last_reward = 0.1
-		last_reward = check_front_distance()
+		last_reward = last_reward + 1
+		#last_reward = check_front_distance()
 		moved = True
 		player_car.move_forward()
 	if keys == 1:
-		last_reward = -0.2
+		#last_reward = -0.2
 		moved = True
 		player_car.move_backward()
 
@@ -371,7 +379,7 @@ def check_front_distance():
 def handle_collision(player_car, computer_car, game_info):
 	global last_reward
 	if player_car.collide(TRACK_BORDER_MASK) != None:
-		last_reward = -500
+		last_reward = last_reward -1000
 		player_car.bounce()
 
 	for bullet in player_car.sensors:
@@ -392,10 +400,10 @@ def handle_collision(player_car, computer_car, game_info):
 	player_finish_poi_collide = player_car.collide(FINISH_MASK, *FINISH_POSITION)
 	if player_finish_poi_collide != None:
 		if player_finish_poi_collide[1] == 0:
-			last_reward = -500
+			last_reward = last_reward -1000
 			player_car.bounce()
 		else:
-			last_reward = 100
+			last_reward = last_reward + 100
 			game_info.next_level()
 			player_car.reset()
 			computer_car.next_level(game_info.level)
@@ -433,10 +441,28 @@ agent.load()
 print(f'scores: ', scores)
 last100_points = []
 
+wavefront_result_matrix = wave_front((WIDTH, HEIGHT), (180, 220), WAVEFRONT_TRACK_BORDER_MASK)
+
+# RESET_CIRCUIT_AT = 60 * 20
+# reset_circuit_counter = 0
+
 while run:
 	clock.tick(FPS)
 
 	draw(WIN, images, player_car, computer_car, game_info)
+	last_reward = 0
+	# if player_car.vel < 0.5:
+	# 	reset_circuit_counter += 1
+
+	# Ignorar por enquanto. Era para resetar o circuito a cada x segundos com o carro parado
+	# if reset_circuit_counter >= RESET_CIRCUIT_AT:
+	# 	reset_circuit_counter = 0
+	# 	last_reward -= 200
+	# 	game_info.reset()
+	# 	player_car.reset()
+	# 	computer_car.reset()
+	# if player_car.vel > 0.5:
+	# 	reset_circuit_counter = 0
 
 	# while not game_info.started:
 	# 	blit_text_center(WIN, MAIN_FONT, f"Press any key to start level {game_info.level}!")
@@ -454,13 +480,31 @@ while run:
 
 	for event in pygame.event.get():
 		if event.type == pygame.QUIT:
-			last_reward = -50
+			last_reward = last_reward -50
 			action = agent.update(last_reward, last_signal) # a rede neural vai indicar a próxima ação
 			scores.append(agent.score())
 			print("saving brain...")
 			agent.save()
 			run = False
 			break
+
+	current_wavefront = wavefront_result_matrix[int(player_car.x)][int(player_car.y)].value
+	
+
+	player_car.last_wavefront_value = player_car.current_wavefront_value
+	player_car.current_wavefront_value = current_wavefront
+	delta_wavefront = player_car.current_wavefront_value - player_car.last_wavefront_value
+	delta_wavefront = delta_wavefront - 1
+	
+	delta_vel = player_car.vel - player_car.last_vel_value
+	delta_vel = delta_vel - 0.5
+
+	print("WAVEFRONT REWARD: ", current_wavefront)
+	print("delta_wavefront: ", delta_wavefront)
+	print("delta_vel: ", delta_vel)
+	#print(reset_circuit_counter, "reset_circuit_counter")
+
+	last_reward = last_reward + delta_wavefront + delta_vel
 
 	#Adicionar os sensores e verificar se há a necessidade da orientação
 	last_signal = [*player_car.get_distance_array(), player_car.vel] # esse é o vetor de entrada, composto por três sinais dos sensores mais a orientação positiva e negativa
