@@ -55,11 +55,11 @@ class Agent():
 
 	def save(self):
 		torch.save({'state_dict': self.model.state_dict(),
-					'optimizer': self.optimizer.state_dict()}, 'last_brain3.pth')
+					'optimizer': self.optimizer.state_dict()}, 'last_brain_seninha.pth')
 	
 	def load(self):
-		if os.path.isfile('last_brain3.pth'):
-			checkpoint = torch.load('last_brain3.pth')
+		if os.path.isfile('last_brain_seninha.pth'):
+			checkpoint = torch.load('last_brain_seninha.pth')
 			self.model.load_state_dict(checkpoint['state_dict'])
 			self.optimizer.load_state_dict(checkpoint['optimizer'])
 			print('Carregado com sucesso')
