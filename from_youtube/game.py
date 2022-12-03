@@ -261,6 +261,10 @@ class GameInfo:
 		self.clock = pygame.time.Clock()
 		self.reset()
 
+		self.iterations = 0
+		self.MAX_ITERATIONS = 60*30
+	
+
 	def next_level(self):
 		self.level += 1
 		self.started = False
@@ -286,6 +290,16 @@ class GameInfo:
 		# esse é o vetor de entrada, composto por três sinais dos sensores mais a orientação positiva e negativa
 		return [*self.player_car.get_distance_array(), self.player_car.vel, self.player_car.angle] 
 
+	def loop_check(self):
+		if(self.player_car.vel <= 0.5):
+			self.iterations += 1
+			if(self.iterations > 60*10):
+				print(self.iterations)
+		else:
+			self.iterations = 0
+		if(self.iterations >= self.MAX_ITERATIONS):
+			self.done = True
+
 	def play_step(self, action):
 		self.done = False
 		self.draw(WIN, self.images, self.player_car)
@@ -294,10 +308,12 @@ class GameInfo:
 		self.move_player(self.player_car, action)
 
 		self.old_distance = self.new_distance
-		self.new_distance = self.wavefront_result_matrix[int(self.player_car.x)][int(self.player_car.y)].value
+		self.new_distance = self.wavefront_result_matrix[int(self.player_car.x + CAR_WIDTH/2)][int(self.player_car.y + CAR_HEIGHT/2)].value
 
 		self.handle_collision(self.player_car)
 		self.player_car.sensorControl()
+
+		self.loop_check()
 
 		return self.reward, self.done, self.score
 
@@ -338,7 +354,7 @@ class GameInfo:
 
 	def handle_collision(self, player_car):
 
-		wavefront_value = self.wavefront_result_matrix[int(self.player_car.x)][int(self.player_car.y)].value
+		wavefront_value = self.wavefront_result_matrix[int(self.player_car.x + CAR_WIDTH/2)][int(self.player_car.y + CAR_HEIGHT/2)].value
 
 		self.score = wavefront_value
 		
