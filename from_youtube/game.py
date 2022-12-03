@@ -346,20 +346,28 @@ class GameInfo:
 			self.iterations = 0
 		if(self.iterations >= self.MAX_ITERATIONS):
 			self.iterations = 0
-			self.reward = -10
+			self.reward = 0.01
 			self.done = True
 
-	def check_curve_distances(self, action):
-		right_right = self.player_car.get_distance_array()[4]
-		left_left = self.player_car.get_distance_array()[0]
+	def check_distances(self, action):
+		right_right = self.player_car.get_distance_array()[0]
+		left_left = self.player_car.get_distance_array()[6]
+		right_inclined = self.player_car.get_distance_array()[10]
+		left_inclined = self.player_car.get_distance_array()[8]
 
-		if right_right > left_left and action[3] == 1 and self.player_car.vel > 0:
+		# print('modulo', abs(right_right - left_left))
+
+		if abs(right_right - left_left) <= 10:
+			print('----------')
+			self.reward += 2
+
+		if right_inclined > left_inclined and action[2] == 1 and self.player_car.vel > 0:
 			self.reward += 1
-		elif left_left > right_right and action[1] == 1 and self.player_car.vel > 0:
+		elif left_inclined > right_inclined and action[1] == 1 and self.player_car.vel > 0:
 			self.reward += 1
 		else:
-			self.reward -= 2
-		print('self.reward', self.reward)
+			self.reward += 0.05
+		# print('self.reward', self.reward)
 
 	def play_step(self, action):
 		self.done = False
@@ -374,6 +382,8 @@ class GameInfo:
 		self.handle_collision(self.player_car)
 
 		self.loop_check()
+
+		pygame.event.get()
 
 		return self.reward, self.done, self.score
 
@@ -399,19 +409,21 @@ class GameInfo:
 
 		# W A S D
 		#[0,0,0,0]
+		self.check_distances(action)
 
-		if np.array_equal(action, [1, 0, 0, 0]):
+		# if np.array_equal(action, [1, 0, 0, 0]):
+		if np.array_equal(action, [1, 0, 0]):
 			player_car.move_forward()
 			moved = True
-		if np.array_equal(action, [0, 0, 1, 0]):
-			player_car.move_backward()
-			moved = True
+		# if np.array_equal(action, [0, 0, 1, 0]):
+		# 	# player_car.move_backward()
+		# 	# moved = True
+		# 	self.done = True
 		
-		if np.array_equal(action, [0, 1, 0, 0]):
-			self.check_curve_distances(action)
+		# if np.array_equal(action, [0, 1, 0, 0]):
+		if np.array_equal(action, [0, 1, 0]):
 			player_car.rotate(left=True)
-		elif np.array_equal(action, [0, 0, 0, 1]):
-			self.check_curve_distances(action)
+		elif np.array_equal(action, [0, 0, 1]):
 			player_car.rotate(right=True)
 
 		if not moved:
@@ -424,7 +436,7 @@ class GameInfo:
 		self.score = wavefront_value
 		
 		if player_car.collide(TRACK_BORDER_MASK) != None:
-			self.reward = -10
+			self.reward = 0.01
 			self.done = True
 		else :
 			self.reward = self.new_distance - self.old_distance
@@ -436,7 +448,7 @@ class GameInfo:
 		player_finish_poi_collide = player_car.collide(FINISH_MASK, *FINISH_POSITION)
 		if player_finish_poi_collide != None:
 			if player_finish_poi_collide[1] == 0:
-				self.reward = -10
+				self.reward = 0.01
 			else:
 				self.reward = 100
 			self.done = True
