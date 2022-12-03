@@ -34,6 +34,14 @@ MAIN_FONT = pygame.font.SysFont("comicsans", 44)
 
 WAVEFRONT_INITIAL_POSITION = (200, 250)
 
+beam_surface = pygame.Surface(WIN.get_rect().center, pygame.SRCALPHA)
+
+mask = pygame.mask.from_surface(WAVEFRONT_TRACK_BORDER)
+mask_fx = pygame.mask.from_surface(pygame.transform.flip(WAVEFRONT_TRACK_BORDER, True, False))
+mask_fy = pygame.mask.from_surface(pygame.transform.flip(WAVEFRONT_TRACK_BORDER, False, True))
+mask_fx_fy = pygame.mask.from_surface(pygame.transform.flip(WAVEFRONT_TRACK_BORDER, True, True))
+flipped_masks = [[mask, mask_fy], [mask_fx, mask_fx_fy]]
+
 FPS = 60
 PATH = [(175, 119), (110, 70), (56, 133), (70, 481), (318, 731), (404, 680), (418, 521), (507, 475), (600, 551), (613, 715), (736, 713),
 		(734, 399), (611, 357), (409, 343), (433, 257), (697, 258), (738, 123), (581, 71), (303, 78), (275, 377), (176, 388), (178, 260)]
@@ -135,7 +143,7 @@ class SensorBullet:
 	def get_distance_from_poi(self, car):
 		if self.last_poi is None:
 			return -1
-		return math.sqrt((car.x - self.last_poi[0])**2 + (car.y - self.last_poi[1])**2)
+		return math.sqrt((car.x + CAR_WIDTH/2 - self.last_poi[0])**2 + (car.y + CAR_HEIGHT/2 - self.last_poi[1])**2)
 		
 class PlayerCar(AbstractCar):
 	IMG = RED_CAR
@@ -147,6 +155,7 @@ class PlayerCar(AbstractCar):
 		self.last_wavefront_value = 0
 		self.current_wavefront_value = 0
 		self.last_vel_value = 0
+		self.distance_array = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
 
 	def reduce_speed(self):
 		self.vel = max(self.vel - self.acceleration / 2, 0)
@@ -170,12 +179,47 @@ class PlayerCar(AbstractCar):
 			bullet.move()
 	
 	def get_distance_array(self):
-		return [bullet.get_distance_from_poi(self) for bullet in self.sensors]
+		return self.distance_array
 
 	def move_forward(self):
 		self.last_vel_value = self.vel
 		self.vel = min(self.vel + self.acceleration, self.max_vel)
 		self.move()
+	
+	def draw_beam(self, surface, base_angle, angle, pos):
+		c = math.cos(math.radians(angle - base_angle))
+		s = math.sin(math.radians(angle - base_angle))
+
+		flip_x = c < 0
+		flip_y = s < 0
+		filpped_mask = flipped_masks[flip_x][flip_y]
+		
+		# compute beam final point
+		x_dest = surface.get_width() * abs(c)
+		y_dest = surface.get_height() * abs(s)
+
+		beam_surface.fill((0, 0, 0, 0))
+
+		# draw a single beam to the beam surface based on computed final point
+		pygame.draw.line(beam_surface, (0, 0, 255), (0, 0), (x_dest, y_dest))
+		beam_mask = pygame.mask.from_surface(beam_surface)
+
+		# find overlap between "global mask" and current beam mask
+		offset_x = surface.get_width()-1 - pos[0] if flip_x else pos[0]
+		offset_y = surface.get_height()-1 - pos[1] if flip_y else pos[1]
+		hit = filpped_mask.overlap(beam_mask, (offset_x, offset_y))
+		if hit is not None and (hit[0] != pos[0] or hit[1] != pos[1]):
+			hx = surface.get_width()-1 - hit[0] if flip_x else hit[0]
+			hy = surface.get_height()-1 - hit[1] if flip_y else hit[1]
+			hit_pos = (hx, hy)
+
+			pygame.draw.line(surface, (0, 0, 255), pos, hit_pos)
+			pygame.draw.circle(surface, (0, 255, 0), hit_pos, 3)
+
+			# return the distance between the car and the hit point
+			return math.sqrt((pos[0] + CAR_WIDTH/2 - hit_pos[0])**2 + (pos[1] + CAR_HEIGHT/2 - hit_pos[1])**2)
+		return -1
+
 
 class ComputerCar(AbstractCar):
 	IMG = GREEN_CAR
@@ -263,7 +307,11 @@ class GameInfo:
 
 		self.iterations = 0
 		self.MAX_ITERATIONS = 60*3
+
+		self.best_position = (0,0)
 	
+	def new_best_position(self, position):
+		self.best_position = position
 
 	def next_level(self):
 		self.level += 1
@@ -273,6 +321,7 @@ class GameInfo:
 		self.level = 1
 		self.started = False
 		self.level_start_time = 0
+		self.iterations = 0
 
 		self.player_car.reset()
 		self.start_level()
@@ -288,7 +337,7 @@ class GameInfo:
 	
 	def get_state(self):
 		# esse é o vetor de entrada, composto por três sinais dos sensores mais a orientação positiva e negativa
-		return [*self.player_car.get_distance_array(), self.player_car.vel, self.player_car.angle] 
+		return [*self.player_car.get_distance_array(), self.player_car.vel] 
 
 	def loop_check(self):
 		if(self.player_car.vel <= 0.5):
@@ -323,7 +372,6 @@ class GameInfo:
 		self.new_distance = self.wavefront_result_matrix[int(self.player_car.x + CAR_WIDTH/2)][int(self.player_car.y + CAR_HEIGHT/2)].value
 
 		self.handle_collision(self.player_car)
-		self.player_car.sensorControl()
 
 		self.loop_check()
 
@@ -333,13 +381,16 @@ class GameInfo:
 		for img, pos in images:
 			win.blit(img, pos)
 
+		i = 0
+		for angle in range(0, 359, 30):
+			distance = self.player_car.draw_beam(WIN, self.player_car.angle, angle, (self.player_car.x + CAR_WIDTH/2, self.player_car.y + CAR_HEIGHT/2))
+			self.player_car.distance_array[i] = distance
+			i += 1
 		player_car.draw(win)
 
-		for bullet in player_car.sensors:
-			bullet.draw(win)
-
 		# DRAW A  POINT
-		pygame.draw.circle(win, (255, 0, 0), WAVEFRONT_INITIAL_POSITION, 5)
+		if self.best_position != (0,0):
+			pygame.draw.circle(win, (255, 0, 0), self.best_position, 5)
 
 		pygame.display.update()
 

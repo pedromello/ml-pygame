@@ -6,7 +6,7 @@ from game import GameInfo
 from model import Linear_QNet, QTrainer
 from helper import plot
 
-MAX_MEMORY = 100_000
+MAX_MEMORY = 200_000
 BATCH_SIZE = 1000
 LR = 0.001
 
@@ -17,7 +17,7 @@ class Agent:
         self.epsilon = 0 # randomness
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        self.model = Linear_QNet(7, 256, 4)
+        self.model = Linear_QNet(13, 128, 4)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def remember(self, state, action, reward, next_state, done):
@@ -39,9 +39,9 @@ class Agent:
 
     def get_action(self, state):
         # random moves: tradeoff exploration / exploitation
-        self.epsilon = 80 - self.n_games
+        self.epsilon = 400 - self.n_games
         final_move = [0,0,0,0]
-        if random.randint(0, 200) < self.epsilon:
+        if random.randint(0, 1000) < self.epsilon:
             move = random.randint(0, 2)
             final_move[move] = 1
         else:
@@ -81,12 +81,14 @@ def train():
 
         if done:
             # train long memory, plot result
+            car_position = (game.player_car.x, game.player_car.y)
             game.reset()
             agent.n_games += 1
             agent.train_long_memory()
 
             if score > record:
                 record = score
+                game.new_best_position(car_position)
                 agent.model.save()
 
             print('Game', agent.n_games, 'Score', score, 'Record:', record)
