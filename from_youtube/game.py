@@ -16,6 +16,7 @@ TRACK_BORDER_MASK = pygame.mask.from_surface(TRACK_BORDER)
 
 WAVEFRONT_TRACK_BORDER = scale_image(pygame.image.load("imgs/wavefront-track.png"), 0.9)
 WAVEFRONT_TRACK_BORDER_MASK = pygame.mask.from_surface(WAVEFRONT_TRACK_BORDER)
+DRAW_WAVEFRONT_VALUES = False
 
 FINISH = pygame.image.load("imgs/finish.png")
 FINISH_MASK = pygame.mask.from_surface(FINISH)
@@ -406,7 +407,8 @@ class GameInfo:
 
 	def draw(self, win, images, player_car):
 
-		images.append((self.wavefront_image, (0, 0)))
+		if(DRAW_WAVEFRONT_VALUES):
+			images.append((self.wavefront_image, (0, 0)))
 
 		for img, pos in images:
 			win.blit(img, pos)
