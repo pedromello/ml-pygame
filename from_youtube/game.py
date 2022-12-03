@@ -262,7 +262,7 @@ class GameInfo:
 		self.reset()
 
 		self.iterations = 0
-		self.MAX_ITERATIONS = 60*30
+		self.MAX_ITERATIONS = 60*3
 	
 
 	def next_level(self):
@@ -293,12 +293,24 @@ class GameInfo:
 	def loop_check(self):
 		if(self.player_car.vel <= 0.5):
 			self.iterations += 1
-			if(self.iterations > 60*10):
-				print(self.iterations)
 		else:
 			self.iterations = 0
 		if(self.iterations >= self.MAX_ITERATIONS):
+			self.iterations = 0
+			self.reward = -10
 			self.done = True
+
+	def check_curve_distances(self, action):
+		right_right = self.player_car.get_distance_array()[4]
+		left_left = self.player_car.get_distance_array()[0]
+
+		if right_right > left_left and action[3] == 1 and self.player_car.vel > 0:
+			self.reward += 1
+		elif left_left > right_right and action[1] == 1 and self.player_car.vel > 0:
+			self.reward += 1
+		else:
+			self.reward -= 2
+		print('self.reward', self.reward)
 
 	def play_step(self, action):
 		self.done = False
@@ -345,8 +357,10 @@ class GameInfo:
 			moved = True
 		
 		if np.array_equal(action, [0, 1, 0, 0]):
+			self.check_curve_distances(action)
 			player_car.rotate(left=True)
 		elif np.array_equal(action, [0, 0, 0, 1]):
+			self.check_curve_distances(action)
 			player_car.rotate(right=True)
 
 		if not moved:
@@ -359,7 +373,7 @@ class GameInfo:
 		self.score = wavefront_value
 		
 		if player_car.collide(TRACK_BORDER_MASK) != None:
-			self.reward = -100
+			self.reward = -10
 			self.done = True
 		else :
 			self.reward = self.new_distance - self.old_distance
@@ -371,9 +385,8 @@ class GameInfo:
 		player_finish_poi_collide = player_car.collide(FINISH_MASK, *FINISH_POSITION)
 		if player_finish_poi_collide != None:
 			if player_finish_poi_collide[1] == 0:
-				self.reward = -100
-				player_car.bounce()
+				self.reward = -10
 			else:
-				self.reward = 10000
-				self.done = True
+				self.reward = 100
+			self.done = True
 

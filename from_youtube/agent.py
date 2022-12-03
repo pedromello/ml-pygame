@@ -60,6 +60,8 @@ def train():
     record = 0
     agent = Agent()
     game = GameInfo()
+    agent.model.load()
+
     while True:
         # get old state
         state_old = game.get_state()
