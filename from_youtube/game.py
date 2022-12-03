@@ -3,9 +3,10 @@ import time
 import math
 from utils import scale_image, blit_rotate_center, blit_text_center, contains
 pygame.font.init()
-from wavefront import wave_front
+from wavefront import wave_front, normalize_wavefront
 from matplotlib import pyplot as plt
 import numpy as np
+from collections import deque
 
 GRASS = scale_image(pygame.image.load("imgs/grass.jpg"), 2.5)
 TRACK = scale_image(pygame.image.load("imgs/track.png"), 0.9)
@@ -14,14 +15,14 @@ TRACK_BORDER = scale_image(pygame.image.load("imgs/track-border.png"), 0.9)
 TRACK_BORDER_MASK = pygame.mask.from_surface(TRACK_BORDER)
 
 WAVEFRONT_TRACK_BORDER = scale_image(pygame.image.load("imgs/wavefront-track.png"), 0.9)
-WAVEFRONT_TRACK_BORDER_MASK = pygame.mask.from_surface(TRACK_BORDER)
+WAVEFRONT_TRACK_BORDER_MASK = pygame.mask.from_surface(WAVEFRONT_TRACK_BORDER)
 
 FINISH = pygame.image.load("imgs/finish.png")
 FINISH_MASK = pygame.mask.from_surface(FINISH)
 
 FINISH_POSITION = (130, 250)
 
-RED_CAR = scale_image(pygame.image.load("imgs/red-car.png"), 0.40)
+RED_CAR = scale_image(pygame.image.load("imgs/red-car.png"), 0.35)
 GREEN_CAR = scale_image(pygame.image.load("imgs/green-car.png"), 0.40)
 
 CAR_WIDTH, CAR_HEIGHT = RED_CAR.get_width(), RED_CAR.get_height()
@@ -33,6 +34,8 @@ pygame.display.set_caption("Racing Game!")
 MAIN_FONT = pygame.font.SysFont("comicsans", 44)
 
 WAVEFRONT_INITIAL_POSITION = (200, 250)
+
+MAX_HISTORY_POSITIONS = 100
 
 beam_surface = pygame.Surface(WIN.get_rect().center, pygame.SRCALPHA)
 
@@ -294,6 +297,8 @@ class GameInfo:
 		self.player_car = PlayerCar(2.5, 4)
 
 		self.wavefront_result_matrix = wave_front((WIDTH, HEIGHT), WAVEFRONT_INITIAL_POSITION, WAVEFRONT_TRACK_BORDER_MASK)
+		self.normalized_result_matrix = normalize_wavefront(self.wavefront_result_matrix)
+		self.wavefront_image = self.create_wavefront_image()
 
 		self.reward = 0
 		self.done = False
@@ -309,9 +314,37 @@ class GameInfo:
 		self.MAX_ITERATIONS = 60*30
 
 		self.best_position = (0,0)
+
+		self.historic_positions = deque(maxlen=MAX_HISTORY_POSITIONS)
+
+	def create_wavefront_image(self):
+		img = pygame.Surface((WIDTH, HEIGHT)).convert_alpha()
+		
+		for x in range(WIDTH):
+			for y in range(HEIGHT):
+				if(self.normalized_result_matrix[x][y].value == 0):
+					img.set_at((x, y), (0, 0, 0, 0))
+				else:
+					img.set_at((x, y), (0, 0, self.normalized_result_matrix[x][y].value, 150))
+		return img
+
+	def render_wavefront(self, win):
+		for i in range(len(self.normalized_result_matrix)):
+			for j in range(len(self.normalized_result_matrix[i])):
+					pygame.draw.rect(win, (self.normalized_result_matrix[j][i].value, 0, 0), (j, i, 1, 1))
+
+	def add_to_historic_positions(self, position):
+		self.historic_positions.append(position)
+
+	def draw_historic_positions(self, win):
+		i = 0
+		length = len(self.historic_positions)
+		for i in range(length):
+			pygame.draw.circle(win, (255 - (length - i)*10, 255 - (length - i)*10, 0), self.historic_positions[i], 5)
+			i += 1
 	
 	def new_best_position(self, position):
-		self.best_position = position
+		self.best_position = (position[0] + CAR_WIDTH/2, position[1] + CAR_HEIGHT/2)
 
 	def next_level(self):
 		self.level += 1
@@ -364,11 +397,21 @@ class GameInfo:
 
 		self.loop_check()
 
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				self.done = True
+				break
+
 		return self.reward, self.done, self.score
 
 	def draw(self, win, images, player_car):
+
+		images.append((self.wavefront_image, (0, 0)))
+
 		for img, pos in images:
 			win.blit(img, pos)
+
+		self.draw_historic_positions(WIN)
 
 		i = 0
 		for angle in range(0, 359, 30):
@@ -413,8 +456,9 @@ class GameInfo:
 		if player_car.collide(TRACK_BORDER_MASK) != None:
 			self.reward = -100
 			self.done = True
+			self.add_to_historic_positions((int(self.player_car.x + CAR_WIDTH/2), int(self.player_car.y + CAR_HEIGHT/2)))
 		else :
-			self.reward = self.new_distance - self.old_distance
+			self.reward = (self.new_distance - self.old_distance) * 3
 
 		for bullet in player_car.sensors:
 			if bullet.collide() != None:
@@ -428,4 +472,7 @@ class GameInfo:
 			else:
 				self.reward = 10000
 				self.done = True
+				self.add_to_historic_positions((int(self.player_car.x + CAR_WIDTH/2), int(self.player_car.y + CAR_HEIGHT/2)))
+		
+			
 

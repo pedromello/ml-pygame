@@ -15,9 +15,9 @@ class Agent:
     def __init__(self):
         self.n_games = 0
         self.epsilon = 0 # randomness
-        self.gamma = 0.9 # discount rate
+        self.gamma = 0.8 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        self.model = Linear_QNet(13, 128, 4)
+        self.model = Linear_QNet(13, 286, 4)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def remember(self, state, action, reward, next_state, done):
@@ -39,15 +39,16 @@ class Agent:
 
     def get_action(self, state):
         # random moves: tradeoff exploration / exploitation
-        self.epsilon = 400 - self.n_games
+        self.epsilon = 250 - self.n_games
         final_move = [0,0,0,0]
         if random.randint(0, 1000) < self.epsilon:
             move = random.randint(0, 2)
             final_move[move] = 1
         else:
-            state0 = torch.tensor(state, dtype=torch.float)
+            state0 = torch.tensor(state, device="cuda", dtype=torch.float)
             prediction = self.model(state0)
             move = torch.argmax(prediction).item()
+            
             final_move[move] = 1
 
         return final_move
@@ -89,7 +90,7 @@ def train():
                 game.new_best_position(car_position)
                 agent.model.save()
 
-            print('Game', agent.n_games, 'Score', score, 'Record:', record)
+            #print('Game', agent.n_games, 'Score', score, 'Record:', record)
 
             plot_scores.append(score)
             total_score += score

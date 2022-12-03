@@ -12,6 +12,18 @@ class WavefrontPixel:
     def simple_to_string(self):
         return "(" + str(self.x) + " " + str(self.y) + "), "
 
+def normalize_wavefront(wavefront):
+    max_value = 0
+    for x in range(len(wavefront)):
+        for y in range(len(wavefront[x])):
+            if wavefront[x][y].value > max_value:
+                max_value = wavefront[x][y].value
+    for x in range(len(wavefront)):
+        for y in range(len(wavefront[x])):
+            wavefront[x][y].value = wavefront[x][y].value / max_value
+            wavefront[x][y].value = wavefront[x][y].value * 255
+    return wavefront
+
 def get_neighbours(x, y, map):
     neighbours = []
     if map.get_at((x,y-1)) != 1:
@@ -66,3 +78,5 @@ def wave_front(grid, start, mask):
         #iterator += 1
 
     return pixels
+
+
