@@ -273,6 +273,7 @@ class GameInfo:
 		self.level = 1
 		self.started = False
 		self.level_start_time = 0
+		self.iterations = 0
 
 		self.player_car.reset()
 		self.start_level()
