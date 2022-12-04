@@ -298,8 +298,8 @@ class GameInfo:
 		self.player_car = PlayerCar(2.5, 4)
 
 		self.wavefront_result_matrix = wave_front((WIDTH, HEIGHT), WAVEFRONT_INITIAL_POSITION, WAVEFRONT_TRACK_BORDER_MASK)
-		self.normalized_result_matrix = normalize_wavefront(self.wavefront_result_matrix)
-		self.wavefront_image = self.create_wavefront_image()
+		#self.normalized_result_matrix = normalize_wavefront(self.wavefront_result_matrix)
+		#self.wavefront_image = self.create_wavefront_image()
 
 		self.reward = 0
 		self.done = False
@@ -311,8 +311,10 @@ class GameInfo:
 		self.clock = pygame.time.Clock()
 		self.reset()
 
+		self.low_speed_iterations = 0
 		self.iterations = 0
-		self.MAX_ITERATIONS = 60*30
+		self.MAX_ITERATIONS_SPEED = 60*30
+		self.MAX_ITERATIONS = 60*60*2
 
 		self.best_position = (0,0)
 
@@ -341,7 +343,7 @@ class GameInfo:
 		i = 0
 		length = len(self.historic_positions)
 		for i in range(length):
-			pygame.draw.circle(win, (255 - (length - i)*10, 255 - (length - i)*10, 0), self.historic_positions[i], 5)
+			pygame.draw.circle(win, (255 - (length - i)*2, 255 - (length - i)*2, 0), self.historic_positions[i], 5)
 			i += 1
 	
 	def new_best_position(self, position):
@@ -356,6 +358,7 @@ class GameInfo:
 		self.started = False
 		self.level_start_time = 0
 		self.iterations = 0
+		self.low_speed_iterations = 0
 
 		self.player_car.reset()
 		self.start_level()
@@ -374,20 +377,29 @@ class GameInfo:
 		return [*self.player_car.get_distance_array(), self.player_car.vel] 
 
 	def loop_check(self):
+		self.iterations += 1
+
+		if self.iterations > self.MAX_ITERATIONS:
+			self.reward = -100
+			self.done = True
+			return
+
 		if(self.player_car.vel <= 0.5):
-			self.iterations += 1
-			if(self.iterations > 60*10):
+			self.low_speed_iterations += 1
+			if(self.low_speed_iterations > 60*10):
 				print(self.iterations)
 		else:
 			self.iterations = 0
-		if(self.iterations >= self.MAX_ITERATIONS):
+		if(self.low_speed_iterations >= self.MAX_ITERATIONS):
 			self.reward = -100
 			self.done = True
+
+		
 
 	def play_step(self, action):
 		self.done = False
 		self.draw(WIN, self.images, self.player_car)
-		self.clock.tick(60)
+		self.clock.tick(600)
 
 		self.move_player(self.player_car, action)
 
@@ -431,19 +443,15 @@ class GameInfo:
 	def move_player(self, player_car, action):
 		moved = False
 
-		# W A S D
-		#[0,0,0,0]
+		# A D Nada(Seguir reto)
+		#[0,0, 0]
 
-		if np.array_equal(action, [1, 0, 0, 0]):
-			player_car.move_forward()
-			moved = True
-		if np.array_equal(action, [0, 0, 1, 0]):
-			player_car.move_backward()
-			moved = True
+		player_car.move_forward()
+		moved = True
 		
-		if np.array_equal(action, [0, 1, 0, 0]):
+		if np.array_equal(action, [1, 0, 0]):
 			player_car.rotate(left=True)
-		elif np.array_equal(action, [0, 0, 0, 1]):
+		elif np.array_equal(action, [0, 1, 0]):
 			player_car.rotate(right=True)
 
 		if not moved:

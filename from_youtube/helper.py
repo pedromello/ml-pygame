@@ -3,11 +3,11 @@ from IPython import display
 
 plt.ion()
 
-def plot(scores, mean_scores):
+def plot(scores, mean_scores, name=""):
     display.clear_output(wait=True)
     display.display(plt.gcf())
     plt.clf()
-    plt.title('Training...')
+    plt.title('Training - ' + name + ' ...')
     plt.xlabel('Number of Games')
     plt.ylabel('Score')
     plt.plot(scores)

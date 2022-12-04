@@ -5,19 +5,23 @@ from collections import deque
 from game import GameInfo
 from model import Linear_QNet, QTrainer
 from helper import plot
+import sys
 
 MAX_MEMORY = 200_000
-BATCH_SIZE = 1000
-LR = 0.001
+BATCH_SIZE = 2000
+LR = 0.5
 
 class Agent:
 
     def __init__(self):
         self.n_games = 0
-        self.epsilon = 0 # randomness
-        self.gamma = 0.8 # discount rate
+        # Esse 5 é 0.05
+        self.initial_epsilon = 20
+        self.final_epsilon = 5
+        self.epsilon = self.initial_epsilon # randomness
+        self.gamma = 0.95 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        self.model = Linear_QNet(13, 286, 4)
+        self.model = Linear_QNet(13, 6, 3)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def remember(self, state, action, reward, next_state, done):
@@ -39,9 +43,9 @@ class Agent:
 
     def get_action(self, state):
         # random moves: tradeoff exploration / exploitation
-        self.epsilon = 250 - self.n_games
-        final_move = [0,0,0,0]
-        if random.randint(0, 1000) < self.epsilon:
+        self.epsilon = max(self.final_epsilon, self.epsilon - self.n_games * 0.01)
+        final_move = [0,0,0]
+        if random.randint(0, 100) < self.epsilon:
             move = random.randint(0, 2)
             final_move[move] = 1
         else:
@@ -79,6 +83,9 @@ def train():
         agent.remember(state_old, final_move, reward, state_new, done)
 
         if done:
+            name_from_terminal = ""
+            if len(sys.argv) > 1:
+                name_from_terminal = sys.argv[1]
             # train long memory, plot result
             car_position = (game.player_car.x, game.player_car.y)
             game.reset()
@@ -88,7 +95,7 @@ def train():
             if score > record:
                 record = score
                 game.new_best_position(car_position)
-                agent.model.save()
+                agent.model.save('model_' + name_from_terminal + '.pth')
 
             #print('Game', agent.n_games, 'Score', score, 'Record:', record)
 
@@ -96,7 +103,8 @@ def train():
             total_score += score
             mean_score = total_score / agent.n_games
             plot_mean_scores.append(mean_score)
-            plot(plot_scores, plot_mean_scores)
+            
+            plot(plot_scores, plot_mean_scores, name_from_terminal)
 
 
 if __name__ == '__main__':
