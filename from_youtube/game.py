@@ -292,6 +292,7 @@ class GameInfo:
 		self.level = level
 		self.started = False
 		self.level_start_time = 0
+		self.quit = False
 		
 		self.images = [(GRASS, (0, 0)), (TRACK, (0, 0)),
 				(FINISH, FINISH_POSITION), (TRACK_BORDER, (0, 0))]
@@ -359,6 +360,8 @@ class GameInfo:
 		self.level_start_time = 0
 		self.iterations = 0
 		self.low_speed_iterations = 0
+		self.old_distance = 0
+		self.new_distance = 0
 
 		self.player_car.reset()
 		self.start_level()
@@ -399,7 +402,7 @@ class GameInfo:
 	def play_step(self, action):
 		self.done = False
 		self.draw(WIN, self.images, self.player_car)
-		self.clock.tick(600)
+		self.clock.tick(100)
 
 		self.move_player(self.player_car, action)
 
@@ -412,7 +415,7 @@ class GameInfo:
 
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
-				self.done = True
+				self.quit = True
 				break
 
 		return self.reward, self.done, self.score
@@ -464,7 +467,7 @@ class GameInfo:
 		self.score = wavefront_value
 		
 		if player_car.collide(TRACK_BORDER_MASK) != None:
-			self.reward = -100
+			self.reward = -10000
 			self.done = True
 			self.add_to_historic_positions((int(self.player_car.x + CAR_WIDTH/2), int(self.player_car.y + CAR_HEIGHT/2)))
 		else :
@@ -480,7 +483,7 @@ class GameInfo:
 				self.reward = -100
 				player_car.bounce()
 			else:
-				self.reward = 10000
+				self.reward = 100000
 				self.done = True
 				self.add_to_historic_positions((int(self.player_car.x + CAR_WIDTH/2), int(self.player_car.y + CAR_HEIGHT/2)))
 		

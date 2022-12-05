@@ -8,20 +8,22 @@ from helper import plot
 import sys
 
 MAX_MEMORY = 200_000
-BATCH_SIZE = 2000
-LR = 0.5
+BATCH_SIZE = 1000
+LR = 0.01
+E_DECAY = 0.005
 
 class Agent:
 
     def __init__(self):
         self.n_games = 0
-        # Esse 5 é 0.05
-        self.initial_epsilon = 20
+        # Esse 20 é 10.0%
+        self.initial_epsilon = 100
+        # Esse 5 é 0.5%
         self.final_epsilon = 5
         self.epsilon = self.initial_epsilon # randomness
-        self.gamma = 0.95 # discount rate
+        self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        self.model = Linear_QNet(13, 6, 3)
+        self.model = Linear_QNet(13, 256, 3)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
 
     def remember(self, state, action, reward, next_state, done):
@@ -43,9 +45,9 @@ class Agent:
 
     def get_action(self, state):
         # random moves: tradeoff exploration / exploitation
-        self.epsilon = max(self.final_epsilon, self.epsilon - self.n_games * 0.01)
+        self.epsilon = max(self.final_epsilon, self.epsilon - self.n_games * E_DECAY)
         final_move = [0,0,0]
-        if random.randint(0, 100) < self.epsilon:
+        if random.randint(0, 1000) < self.epsilon:
             move = random.randint(0, 2)
             final_move[move] = 1
         else:
@@ -74,6 +76,8 @@ def train():
 
         # perform move and get new state
         reward, done, score = game.play_step(final_move)
+
+
         state_new = game.get_state()
 
         # train short memory
@@ -83,9 +87,8 @@ def train():
         agent.remember(state_old, final_move, reward, state_new, done)
 
         if done:
-            name_from_terminal = ""
-            if len(sys.argv) > 1:
-                name_from_terminal = sys.argv[1]
+            name_from_terminal = "Network 13-256-3"
+
             # train long memory, plot result
             car_position = (game.player_car.x, game.player_car.y)
             game.reset()
@@ -105,6 +108,20 @@ def train():
             plot_mean_scores.append(mean_score)
             
             plot(plot_scores, plot_mean_scores, name_from_terminal)
+
+            # write plot_scores to csv
+            with open('plot_scores_' + name_from_terminal + '.csv', 'w') as f:
+                for item in plot_scores:
+                    f.write("%s," % item)
+            
+            # write plot_mean_scores to file
+            with open('plot_mean_scores_' + name_from_terminal + '.csv', 'w') as f:
+                for item in plot_mean_scores:
+                    f.write("%s," % item)
+
+        if(game.quit == True):
+            sys.exit()
+
 
 
 if __name__ == '__main__':
